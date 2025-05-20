@@ -84,6 +84,16 @@ I hope you enjoy your Neovim journey,
 P.S. You can delete this when you're done too. It's your config now! :)
 --]]
 
+-- ─── indentation settings ────────────────────────────────────────────────
+vim.opt.expandtab = true -- use spaces, not literal tabs
+vim.opt.tabstop = 2 -- a real TAB is displayed as 2 spaces
+vim.opt.softtabstop = 2 -- number of spaces to insert when you press <Tab>
+vim.opt.shiftwidth = 2 -- number of spaces to use for auto-indent (e.g. with >> or O)
+vim.opt.autoindent = true
+vim.opt.smartindent = false
+vim.opt.cindent = false
+-- ─────────────────────────────────────────────────────────────────────────
+--
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -91,7 +101,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -247,7 +257,7 @@ rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
-  'NMAC427/guess-indent.nvim', -- Detect tabstop and shiftwidth automatically
+  'NMAC427/guess-indent.nvim', -- Detect tabstop and shiftwidth automaticallyinit
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -275,11 +285,51 @@ require('lazy').setup({
     'lewis6991/gitsigns.nvim',
     opts = {
       signs = {
-        add = { text = '+' },
-        change = { text = '~' },
+        add = { text = '┃' },
+        change = { text = '┃' },
         delete = { text = '_' },
         topdelete = { text = '‾' },
         changedelete = { text = '~' },
+        untracked = { text = '┆' },
+      },
+      signs_staged = {
+        add = { text = '┃' },
+        change = { text = '┃' },
+        delete = { text = '_' },
+        topdelete = { text = '‾' },
+        changedelete = { text = '~' },
+        untracked = { text = '┆' },
+      },
+      signs_staged_enable = true,
+      signcolumn = true, -- Toggle with `:Gitsigns toggle_signs`
+      numhl = false, -- Toggle with `:Gitsigns toggle_numhl`
+      linehl = false, -- Toggle with `:Gitsigns toggle_linehl`
+      word_diff = false, -- Toggle with `:Gitsigns toggle_word_diff`
+      watch_gitdir = {
+        follow_files = true,
+      },
+      auto_attach = true,
+      attach_to_untracked = false,
+      current_line_blame = false, -- Toggle with `:Gitsigns toggle_current_line_blame`
+      current_line_blame_opts = {
+        virt_text = true,
+        virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'
+        delay = 1000,
+        ignore_whitespace = false,
+        virt_text_priority = 100,
+        use_focus = true,
+      },
+      current_line_blame_formatter = '<author>, <author_time:%R> - <summary>',
+      sign_priority = 6,
+      update_debounce = 100,
+      status_formatter = nil, -- Use default
+      max_file_length = 40000, -- Disable if file is longer than this (in lines)
+      preview_config = {
+        -- Options passed to nvim_open_win
+        style = 'minimal',
+        relative = 'cursor',
+        row = 0,
+        col = 1,
       },
     },
   },
@@ -404,14 +454,15 @@ require('lazy').setup({
       -- [[ Configure Telescope ]]
       -- See `:help telescope` and `:help telescope.setup()`
       require('telescope').setup {
-        -- You can put your default mappings / updates / etc. in here
-        --  All the info you're looking for is in `:help telescope.setup()`
-        --
-        -- defaults = {
-        --   mappings = {
-        --     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-        --   },
-        -- },
+        defaults = {
+          layout_strategy = 'horizontal',
+          layout_config = {
+            width = 0.95,
+            height = 0.95,
+            preview_cutoff = 120,
+            preview_width = 0.65,
+          },
+        },
         -- pickers = {}
         extensions = {
           ['ui-select'] = {
@@ -661,6 +712,57 @@ require('lazy').setup({
       --  So, we create new capabilities with blink.cmp, and then broadcast that to the servers.
       local capabilities = require('blink.cmp').get_lsp_capabilities()
 
+      -- ─── manual html + emmet wiring ────────────────────────────────────────
+      local lspconfig = require 'lspconfig'
+
+      -- 1) Attach vscode-html-language-server to .php buffers
+      lspconfig.html.setup {
+        cmd = { 'vscode-html-language-server', '--stdio' },
+        filetypes = { 'html', 'php', 'blade', 'twig' },
+        init_options = {
+          configurationSection = { 'html', 'css', 'javascript' },
+          embeddedLanguages = { css = true, javascript = true },
+          provideFormatter = true,
+        },
+        capabilities = capabilities,
+      }
+
+      -- 2) Attach Emmet LSP to .php buffers, treating PHP as HTML
+      lspconfig.emmet_ls.setup {
+        cmd = { 'emmet-ls', '--stdio' },
+        filetypes = {
+          'html',
+          'php',
+          'blade',
+          'twig',
+          'css',
+          'javascriptreact',
+          'typescriptreact',
+          'vue',
+          'svelte',
+          'astro',
+        },
+        init_options = {
+          includeLanguages = { php = 'html' },
+        },
+        capabilities = capabilities,
+      }
+      -- ────────────────────────────────────────────────────────────────────────
+
+      -- Format PHP (and its embedded HTML) via LSP on save
+      vim.api.nvim_create_autocmd('BufWritePre', {
+        pattern = '*.php',
+        callback = function(ctx)
+          vim.lsp.buf.format {
+            bufnr = ctx.buf,
+            filter = function(client)
+              -- only use the HTML LSP and phpactor for formatting
+              return client.name == 'html' or client.name == 'phpactor'
+            end,
+          }
+        end,
+      })
+
       -- Enable the following language servers
       --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
       --
@@ -684,6 +786,29 @@ require('lazy').setup({
         -- ts_ls = {},
         --
 
+        -- HTML LSP for tags/attributes completion
+        html = {
+          filetypes = { 'html', 'php', 'blade', 'twig' },
+          capabilities = capabilities,
+        },
+
+        -- Emmet for abbreviation expansion
+        emmet_ls = {
+          filetypes = {
+            'html',
+            'php',
+            'css',
+            'javascriptreact',
+            'typescriptreact',
+            'twig',
+          },
+          init_options = {
+            -- treat PHP as HTML so <div>, <ul> etc. complete
+            includeLanguages = { php = 'html' },
+          },
+          capabilities = capabilities,
+        },
+
         lua_ls = {
           -- cmd = { ... },
           -- filetypes = { ... },
@@ -698,6 +823,9 @@ require('lazy').setup({
             },
           },
         },
+
+        phpactor = {},
+        tailwindcss = {},
       }
 
       -- Ensure the servers and tools above are installed
@@ -768,6 +896,10 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        php = { 'php_cs_fixer', 'prettierd', stop_after_first = true },
+        javascript = { 'prettierd' },
+        html = { 'prettierd' },
+        css = { 'prettierd' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -850,7 +982,7 @@ require('lazy').setup({
       completion = {
         -- By default, you may press `<c-space>` to show the documentation.
         -- Optionally, set `auto_show = true` to show the documentation after a delay.
-        documentation = { auto_show = false, auto_show_delay_ms = 500 },
+        documentation = { auto_show = true, auto_show_delay_ms = 0 },
       },
 
       sources = {
@@ -944,7 +1076,7 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'php' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -955,6 +1087,7 @@ require('lazy').setup({
         additional_vim_regex_highlighting = { 'ruby' },
       },
       indent = { enable = true, disable = { 'ruby' } },
+      injections = { enable = true },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -974,11 +1107,11 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.

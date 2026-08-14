@@ -9,6 +9,7 @@ return {
   {
     "neovim/nvim-lspconfig",
     event = "User FilePost",
+    dependencies = { "SmiteshP/nvim-navic" },
     config = function()
       require "configs.lspconfig"
     end,
@@ -81,6 +82,22 @@ return {
       { "<leader>xr", "<cmd>Trouble lsp_references toggle<cr>", desc = "LSP References (Trouble)" },
     },
     opts = {},
+  },
+
+  {
+    "petertriho/nvim-scrollbar",
+    event = "BufReadPost",
+    config = function()
+      require("scrollbar").setup {
+        handle = { color = "grey" },
+        handlers = {
+          cursor = false, -- the cursor position marker gets noisy; diagnostics/git are the useful ones
+          diagnostic = true,
+          gitsigns = true, -- auto-wires into gitsigns, already bundled by NvChad core
+          search = false, -- needs a separate nvim-hlslens dependency, skipping for now
+        },
+      }
+    end,
   },
 
   {

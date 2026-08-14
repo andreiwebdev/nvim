@@ -5,21 +5,28 @@ local options = {
     prettier = {
       -- Use the local prettier binary
       command = "prettier",
-      -- Add the arguments that explicitly load the Vue plugin
-      args = {
-        "--stdin-filepath",
-        "$FILENAME",
-        -- This is the crucial part that loads the parser for Vue templates
-        "--plugin",
-        "prettier-plugin-vue",
-      },
+      -- Only load the Vue plugin for actual .vue files: forcing it
+      -- unconditionally broke every other filetype routed through this
+      -- formatter (js/ts/css/html/json/yaml/md), since prettier hard-fails
+      -- when a --plugin can't be resolved, even if that file has nothing
+      -- to do with Vue.
+      args = function(_, ctx)
+        local args = { "--stdin-filepath", "$FILENAME" }
+        if vim.endswith(ctx.filename, ".vue") then
+          vim.list_extend(args, { "--plugin", "prettier-plugin-vue" })
+        end
+        return args
+      end,
     },
   },
 
   formatters_by_ft = {
     lua = { "stylua" },
-    twig = { "djlint" },
-    php = { "php_cs_fixer" },
+
+    -- twig (djlint) and php (php_cs_fixer) are intentionally left
+    -- unformatted for now: djlint needs Python >=3.10 (system has 3.9.6)
+    -- and php_cs_fixer needs a local `php` binary, neither of which is
+    -- available on this machine. Revisit once either is in place.
 
     -- We revert these to only use the *customized* 'prettier'
     -- (We don't need prettierd if it was causing problems)

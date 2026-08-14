@@ -1,6 +1,35 @@
-require("nvchad.configs.lspconfig").defaults()
+local nvlsp = require("nvchad.configs.lspconfig")
+nvlsp.defaults()
 
 local util = require("lspconfig.util")
+
+-- Winbar breadcrumbs (nvim-navic): wrap the wildcard on_attach so every
+-- server that supports documentSymbol gets a breadcrumb trail, without
+-- having to repeat this in each per-server block below.
+local navic = require("nvim-navic")
+
+local function on_attach(client, bufnr)
+  nvlsp.on_attach(client, bufnr)
+
+  if client.server_capabilities.documentSymbolProvider then
+    navic.attach(client, bufnr)
+
+    local function set_winbar()
+      vim.wo.winbar = "%{%v:lua.require'nvim-navic'.get_location()%}"
+    end
+
+    for _, win in ipairs(vim.fn.win_findbuf(bufnr)) do
+      vim.api.nvim_win_call(win, set_winbar)
+    end
+    vim.api.nvim_create_autocmd("BufWinEnter", { buffer = bufnr, callback = set_winbar })
+  end
+end
+
+vim.lsp.config("*", {
+  on_attach = on_attach,
+  on_init = nvlsp.on_init,
+  capabilities = nvlsp.capabilities,
+})
 
 -- Auto-collect global Composer stub paths (php-stubs + baxtian)
 local function composer_php_stubs()
@@ -61,10 +90,6 @@ vim.lsp.config("vtsls", {
 })
 
 vim.lsp.config("intelephense", {
-  on_init = require("nvchad.configs.lspconfig").on_init,
-  on_attach = require("nvchad.configs.lspconfig").on_attach,
-  capabilities = require("nvchad.configs.lspconfig").capabilities,
-
   settings = {
     intelephense = {
       environment = {
@@ -128,10 +153,6 @@ vim.lsp.config("intelephense", {
 
 -- --- Twig / twiggy_language_server
 vim.lsp.config("twiggy_language_server", {
-  on_init = require("nvchad.configs.lspconfig").on_init,
-  on_attach = require("nvchad.configs.lspconfig").on_attach,
-  capabilities = require("nvchad.configs.lspconfig").capabilities,
-
   -- ensure the workspaceFolder = your THEME root
   -- (native vim.lsp.enable autostart expects the async `(bufnr, on_dir)`
   -- signature, not the old lspconfig-style `(fname) -> string`)
@@ -163,10 +184,6 @@ vim.lsp.config("twiggy_language_server", {
 
 -- Emmet: enable HTML-like tag expansion in Twig, PHP, Vue, etc.
 vim.lsp.config("emmet_ls", {
-  on_init = require("nvchad.configs.lspconfig").on_init,
-  on_attach = require("nvchad.configs.lspconfig").on_attach,
-  capabilities = require("nvchad.configs.lspconfig").capabilities,
-
   filetypes = {
     "html",
     "css",

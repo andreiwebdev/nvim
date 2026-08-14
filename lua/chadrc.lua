@@ -7,12 +7,16 @@ local M = {}
 
 M.base46 = {
 	theme = "onedark",
-  transparency = true
+  transparency = true,
 
-	-- hl_override = {
-	-- 	Comment = { italic = true },
-	-- 	["@comment"] = { italic = true },
-	-- },
+  -- Give the sticky treesitter-context header (and its separator line) a
+  -- solid background so it stays visible over Ghostty's opacity/blur
+  -- instead of inheriting the global transparency = true above.
+  hl_override = {
+    TreesitterContext = { bg = "#282c34" },
+    TreesitterContextSeparator = { fg = "#3e4451" },
+    TreesitterContextLineNumber = { bg = "#282c34" },
+  },
 }
 
 -- M.nvdash = { load_on_startup = true }

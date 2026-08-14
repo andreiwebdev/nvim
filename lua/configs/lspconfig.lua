@@ -133,8 +133,11 @@ vim.lsp.config("twiggy_language_server", {
   capabilities = require("nvchad.configs.lspconfig").capabilities,
 
   -- ensure the workspaceFolder = your THEME root
-  root_dir = function(fname)
-    return util.root_pattern("style.css", "composer.json", ".git")(fname)
+  -- (native vim.lsp.enable autostart expects the async `(bufnr, on_dir)`
+  -- signature, not the old lspconfig-style `(fname) -> string`)
+  root_dir = function(bufnr, on_dir)
+    local fname = vim.api.nvim_buf_get_name(bufnr)
+    on_dir(util.root_pattern("style.css", "composer.json", ".git")(fname))
   end,
 
   settings = {
